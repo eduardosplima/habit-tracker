@@ -200,25 +200,9 @@
     </div>
 
     <script>
-        const defaultHabits = {
-            diario: ["Alongamento", "Arrumar a cama", "Pomada olheira", "Fio dental", "Escovação", "Enxaguante bucal", "Banho", "Fernanda", "Aniversariantes", "Fast-food (Evitar)", "Pijama"],
-            comercial: ["Morning Call", "Guilherme / Treinamento", "WhatsApp", "GetNinjas", "CRM / Cadência", "WhatsApp Status", "LinkedIn (Boas Vindas)", "LinkedIn (Aniversariantes)", "LinkedIn (Postar / Pedir)", "Instagram (Story)", "Instagram (Postar)", "Prospectar em Grupos", "Resumos Atendimentos"],
-            autocuidado: [
-                { category: "Cabelo", items: ["Lavar o Cabelo", "Secar o cabelo", "Brilho cabelo"] },
-                { category: "Skincare", items: ["Demaquilante", "Esfoliante Facial", "Sabonete facial", "Tônico facial", "Pomada olhos", "Hipoglós", "Hidratante Facial"] },
-                { category: "Pós Banho", items: ["Hidratante Corporal", "Desodorante", "Perfume"] },
-                { category: "Pés", items: ["[Pés] Esfoliante", "[Pés] Hidratante"] },
-                { category: "Mãos", items: ["[Mãos] Esfoliante", "[Mãos] Cutícula", "[Mãos] Hidratante"] },
-                { category: "Unhas", items: ["[Unha] Cortar", "[Unha] Lixar", "[Unha] Base", "[Unha] Pintar", "[Unha] Gel brilho"] }
-            ],
-            remedios: ["☕️ B12 (10h)", "🍲 Fostair (12h)", "🍲 Busonid (12h)", "🍲 Multivitamínico Belt (12h)", "🍲 Lavitan (12h)", "💉 Mounjaro (Sexta)", "🍲 Vitamina D3 (Terças)", "🍲 Omegafor (16h)", "🥪 Ansiedade (16h)", "🍽️ Endofer (19h)", "🍽️ Vitamina C  (19h)", "🍲 Fostair (19h)", "🛏️ Melatonina (23h)"],
-            semanal: ["Facebook/SMS/Emails/WhatsApp", "Global", "Instagram (Story)", "Contas Financeiras"],
-            mensal: ["Instagram (Status)", "Música", "Leitura", "Inglês - YouTube", "YouTube Atrasados", "Brincar Gatos", "Fernanda Contas", "Massagem Edu", "Unha Gatos", "Depilação Laser", "Ligar Pai", "Multas Argo", "Streaming", "Peso", "Menstruação", "Processo Bradesco", "Fazer Compras", "Abastecer/Calibrar Pneu", "Lavar Carro", "Sobrancelha/Unha", "Cidadania/Visto", "Encontro Amigos", "Primeiros Socorros", "Doar Sangue", "Limpeza", "Médicos"]
-        };
-
         let appState = JSON.parse(localStorage.getItem('habit_pro_state')) || {
             userRecords: {},
-            habitConfig: JSON.parse(JSON.stringify(defaultHabits)),
+            habitConfig: {},
             deletedHistory: {}
         };
 
