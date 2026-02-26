@@ -232,7 +232,8 @@
         let currentReferenceDate = new Date(); // Data base para navegação
         let heatmapYear = new Date().getFullYear();
         
-        const todayStr = new Date().toISOString().split('T')[0];
+        const today = new Date();
+        const todayStr = today.toISOString().split('T')[0];
         const tabNames = { diario: 'Diário', comercial: 'Comercial', autocuidado: 'Autocuidado', remedios: 'Saúde', semanal: 'Semanal', mensal: 'Mensal' };
 
         function init() {
@@ -286,7 +287,7 @@
             
             list.forEach((entry, index) => {
                 if (typeof entry === 'object' && entry.category) {
-                    const hasVisible = entry.items.length === 0 || entry.items.some(h => isHabitVisible(h, startOfWeekStr));
+                    const hasVisible = (entry.items.length === 0 && getStartOfWeek(currentReferenceDate) <= getStartOfWeek(today)) || entry.items.some(h => isHabitVisible(h, startOfWeekStr));
                     if (hasVisible) {
                         html += `<div class="category-header"><span>${entry.category}</span><div class="flex items-center gap-0.5"><button onclick="moveCategory('${currentTab}', ${index}, -1)" class="action-btn btn-move" title="Mover para cima">▲</button><button onclick="moveCategory('${currentTab}', ${index}, 1)" class="action-btn btn-move" title="Mover para baixo">▼</button><button onclick="deleteCategory('${currentTab}', ${index})" class="action-btn btn-delete" title="Remover categoria"><svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path d="M6 18L18 6M6 6l12 12"/></svg></button></div></div>`;
                         entry.items.forEach((h, subIdx) => {
@@ -399,7 +400,7 @@
         }
 
         function resetToToday() {
-            currentReferenceDate = new Date();
+            currentReferenceDate = new Date(today);
             updateLabels();
             renderGrid();
         }
