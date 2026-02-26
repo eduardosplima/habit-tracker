@@ -30,8 +30,8 @@
         }
 
         .habit-name-cell {
-            justify-content: flex-start;
-            gap: 8px;
+            justify-content: space-between;
+            gap: 4px;
             font-size: 0.85rem;
             font-weight: 500;
             color: #334155;
@@ -87,6 +87,7 @@
             justify-content: space-between;
             align-items: center;
         }
+        .category-header:hover .action-btn { opacity: 1; }
 
         .heatmap-month-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
         .heatmap-cell { aspect-ratio: 1/1; border-radius: 3px; background-color: #e2e8f0; }
@@ -98,6 +99,7 @@
         .date-picker-input::-webkit-calendar-picker-indicator {
             cursor: pointer;
         }
+        button:disabled { opacity: 0.35; cursor: not-allowed; pointer-events: none; }
     </style>
 </head>
 <body class="p-4 md:p-8">
@@ -139,7 +141,10 @@
         <!-- Gerenciamento de Dados e Adição -->
         <div class="flex flex-wrap gap-4 items-center justify-between bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
             <div class="flex flex-wrap gap-3 items-center">
-                <button onclick="openAddModal()" class="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-700 transition-all">
+                <button id="btn-add-category" onclick="openAddCategoryModal()" class="flex items-center gap-2 px-4 py-2 bg-indigo-500 text-white rounded-xl text-xs font-bold hover:bg-indigo-600 transition-all">
+                    <span class="text-lg leading-none">+</span> Nova Categoria
+                </button>
+                <button id="btn-add-habit" onclick="openAddHabitModal()" class="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-700 transition-all">
                     <span class="text-lg leading-none">+</span> Novo Hábito
                 </button>
                 <div class="h-6 w-px bg-slate-200 mx-2"></div>
@@ -189,7 +194,15 @@
         <div class="bg-white rounded-3xl max-w-sm w-full p-8 shadow-2xl">
             <h3 class="text-xl font-bold text-slate-800 mb-2" id="modalTitle">Título</h3>
             <p class="text-slate-500 text-sm mb-6" id="modalText">Descrição.</p>
-            <div id="modalInputContainer" class="hidden mb-6">
+            <div id="modalInputContainer" class="hidden mb-6 space-y-3">
+                <div id="categorySelectWrapper" class="hidden relative">
+                    <input type="hidden" id="categorySelect" value="">
+                    <button type="button" id="categoryDropdownBtn" onclick="toggleCategoryDropdown(event)" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 text-left flex items-center justify-between outline-none focus:ring-2 focus:ring-blue-500 transition-colors hover:bg-slate-100">
+                        <span id="categoryDropdownLabel" class="truncate">Sem categoria</span>
+                        <svg id="categoryDropdownChevron" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" class="shrink-0 ml-2 text-slate-400 transition-transform"><path d="M19 9l-7 7-7-7"/></svg>
+                    </button>
+                    <div id="categoryDropdownList" class="hidden absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-20 overflow-hidden max-h-48 overflow-y-auto"></div>
+                </div>
                 <input type="text" id="habitInput" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Nome do hábito...">
             </div>
             <div class="flex justify-end gap-3">
@@ -200,9 +213,18 @@
     </div>
 
     <script>
+        const defaultHabits = {
+            diario: [],
+            comercial: [],
+            autocuidado: [],
+            remedios: [],
+            semanal: [],
+            mensal: []
+        };
+
         let appState = JSON.parse(localStorage.getItem('habit_pro_state')) || {
             userRecords: {},
-            habitConfig: {},
+            habitConfig: defaultHabits,
             deletedHistory: {}
         };
 
@@ -211,6 +233,7 @@
         let heatmapYear = new Date().getFullYear();
         
         const todayStr = new Date().toISOString().split('T')[0];
+        const tabNames = { diario: 'Diário', comercial: 'Comercial', autocuidado: 'Autocuidado', remedios: 'Saúde', semanal: 'Semanal', mensal: 'Mensal' };
 
         function init() {
             document.getElementById('date-selector').value = currentReferenceDate.toISOString().split('T')[0];
@@ -263,12 +286,15 @@
             
             list.forEach((entry, index) => {
                 if (typeof entry === 'object' && entry.category) {
-                    html += `<div class="category-header"><span>${entry.category}</span></div>`;
-                    entry.items.forEach((h, subIdx) => {
-                        if (isHabitVisible(h, startOfWeekStr)) {
-                            html += renderRow(h, index, subIdx, true);
-                        }
-                    });
+                    const hasVisible = entry.items.length === 0 || entry.items.some(h => isHabitVisible(h, startOfWeekStr));
+                    if (hasVisible) {
+                        html += `<div class="category-header"><span>${entry.category}</span><div class="flex items-center gap-0.5"><button onclick="moveCategory('${currentTab}', ${index}, -1)" class="action-btn btn-move" title="Mover para cima">▲</button><button onclick="moveCategory('${currentTab}', ${index}, 1)" class="action-btn btn-move" title="Mover para baixo">▼</button><button onclick="deleteCategory('${currentTab}', ${index})" class="action-btn btn-delete" title="Remover categoria"><svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path d="M6 18L18 6M6 6l12 12"/></svg></button></div></div>`;
+                        entry.items.forEach((h, subIdx) => {
+                            if (isHabitVisible(h, startOfWeekStr)) {
+                                html += renderRow(h, index, subIdx, true);
+                            }
+                        });
+                    }
                 } else {
                     if (isHabitVisible(entry, startOfWeekStr)) {
                         html += renderRow(entry, index, null, false);
@@ -287,15 +313,15 @@
 
         function renderRow(habit, index, subIdx, isSubItem) {
             let row = `
-                <div class="habit-cell habit-name-cell border-r border-slate-100 group">
-                    <button onclick="deleteHabit('${habit}')" class="action-btn btn-delete" title="Remover daqui em diante">
-                        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path d="M6 18L18 6M6 6l12 12"></path></svg>
-                    </button>
-                    <div class="flex flex-col">
-                        <button onclick="moveHabit('${currentTab}', ${index}, ${subIdx}, -1)" class="action-btn btn-move py-0 h-3">▲</button>
-                        <button onclick="moveHabit('${currentTab}', ${index}, ${subIdx}, 1)" class="action-btn btn-move py-0 h-3">▼</button>
+                <div class="habit-cell habit-name-cell border-r border-slate-100">
+                    <span class="truncate flex-1 min-w-0${isSubItem ? ' pl-4' : ''}" title="${habit}">${habit}</span>
+                    <div class="flex items-center gap-0.5 shrink-0">
+                        <button onclick="moveHabit('${currentTab}', ${index}, ${subIdx}, -1)" class="action-btn btn-move" title="Mover para cima">▲</button>
+                        <button onclick="moveHabit('${currentTab}', ${index}, ${subIdx}, 1)" class="action-btn btn-move" title="Mover para baixo">▼</button>
+                        <button onclick="deleteHabit('${habit}')" class="action-btn btn-delete" title="Remover daqui em diante">
+                            <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path d="M6 18L18 6M6 6l12 12"></path></svg>
+                        </button>
                     </div>
-                    <span class="truncate" title="${habit}">${habit}</span>
                 </div>`;
 
             const start = getStartOfWeek(currentReferenceDate);
@@ -385,14 +411,50 @@
         }
 
         // CRUD & Gestão
-        function openAddModal() {
+        function openAddCategoryModal() {
             document.getElementById('modalInputContainer').classList.remove('hidden');
+            document.getElementById('categorySelect').classList.add('hidden');
             document.getElementById('habitInput').value = '';
-            showModal("Novo Hábito", `Adicionar em ${currentTab}`, () => {
+            document.getElementById('habitInput').placeholder = 'Nome da categoria...';
+            showModal("Nova Categoria", `Adicionar categoria em ${tabNames[currentTab] || currentTab}`, () => {
                 const val = document.getElementById('habitInput').value.trim();
                 if (val) {
-                    if (currentTab === 'autocuidado') {
-                        appState.habitConfig[currentTab][0].items.push(val);
+                    appState.habitConfig[currentTab].push({ category: val, items: [] });
+                    save();
+                    renderGrid();
+                    closeModal();
+                }
+            });
+        }
+
+        function openAddHabitModal() {
+            const categories = appState.habitConfig[currentTab]
+                .filter(e => typeof e === 'object' && e.category);
+            document.getElementById('modalInputContainer').classList.remove('hidden');
+            document.getElementById('habitInput').value = '';
+            document.getElementById('habitInput').placeholder = 'Nome do hábito...';
+            const wrapper = document.getElementById('categorySelectWrapper');
+            if (categories.length > 0) {
+                const itemClass = 'w-full px-4 py-3 text-sm text-slate-700 text-left hover:bg-slate-50 border-b border-slate-100 last:border-0 transition-colors';
+                document.getElementById('categoryDropdownList').innerHTML =
+                    `<button type="button" onclick="selectCategory('','Sem categoria')" class="${itemClass}">Sem categoria</button>` +
+                    categories.map((c, i) => `<button type="button" onclick="selectCategory('${i}','${c.category.replace(/'/g, "\\'")}')" class="${itemClass}">${c.category}</button>`).join('');
+                document.getElementById('categorySelect').value = '';
+                document.getElementById('categoryDropdownLabel').textContent = 'Sem categoria';
+                document.getElementById('categoryDropdownList').classList.add('hidden');
+                document.getElementById('categoryDropdownChevron').style.transform = '';
+                wrapper.classList.remove('hidden');
+            } else {
+                wrapper.classList.add('hidden');
+            }
+            showModal("Novo Hábito", `Adicionar hábito em ${tabNames[currentTab] || currentTab}`, () => {
+                const val = document.getElementById('habitInput').value.trim();
+                if (val) {
+                    const selectedIdx = document.getElementById('categorySelect').value;
+                    if (categories.length > 0 && selectedIdx !== '') {
+                        const catEntry = appState.habitConfig[currentTab]
+                            .filter(e => typeof e === 'object' && e.category)[parseInt(selectedIdx)];
+                        catEntry.items.push(val);
                     } else {
                         appState.habitConfig[currentTab].push(val);
                     }
@@ -410,6 +472,41 @@
                 renderGrid();
                 closeModal();
             });
+        }
+
+        function deleteCategory(tab, index) {
+            const cat = appState.habitConfig[tab][index];
+            showModal("Remover Categoria?", `"${cat.category}" será removida das datas futuras.`, () => {
+                cat.items.forEach(h => { appState.deletedHistory[h] = todayStr; });
+                save();
+                renderGrid();
+                closeModal();
+            });
+        }
+
+        function moveCategory(tab, index, dir) {
+            const list = appState.habitConfig[tab];
+            const next = index + dir;
+            if (next < 0 || next >= list.length) return;
+            const [removed] = list.splice(index, 1);
+            list.splice(next, 0, removed);
+            save();
+            renderGrid();
+        }
+
+        function toggleCategoryDropdown(e) {
+            e.stopPropagation();
+            const list = document.getElementById('categoryDropdownList');
+            const chevron = document.getElementById('categoryDropdownChevron');
+            const isHidden = list.classList.toggle('hidden');
+            chevron.style.transform = isHidden ? '' : 'rotate(180deg)';
+        }
+
+        function selectCategory(value, label) {
+            document.getElementById('categorySelect').value = value;
+            document.getElementById('categoryDropdownLabel').textContent = label;
+            document.getElementById('categoryDropdownList').classList.add('hidden');
+            document.getElementById('categoryDropdownChevron').style.transform = '';
         }
 
         function moveHabit(tab, index, subIdx, dir) {
@@ -463,6 +560,9 @@
             active.classList.add('tab-active');
             active.classList.remove('text-slate-500');
             currentTab = t;
+            const isAnual = t === 'anual';
+            document.getElementById('btn-add-category').disabled = isAnual;
+            document.getElementById('btn-add-habit').disabled = isAnual;
             renderGrid();
         }
 
@@ -477,6 +577,9 @@
         function closeModal() {
             document.getElementById('customModal').classList.add('hidden');
             document.getElementById('modalInputContainer').classList.add('hidden');
+            document.getElementById('categorySelectWrapper').classList.add('hidden');
+            document.getElementById('categoryDropdownList').classList.add('hidden');
+            document.getElementById('categoryDropdownChevron').style.transform = '';
         }
 
         function showStatus() {
