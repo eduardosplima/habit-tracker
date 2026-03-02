@@ -89,12 +89,29 @@
         }
         .category-header:hover .action-btn { opacity: 1; }
 
-        .heatmap-month-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
-        .heatmap-cell { aspect-ratio: 1/1; border-radius: 3px; background-color: #e2e8f0; }
+        .heatmap-month-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+        .heatmap-cell {
+            border-radius: 4px;
+            background-color: #e2e8f0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 2px 1px;
+            min-height: 30px;
+            cursor: default;
+            transition: opacity 0.15s;
+        }
+        .heatmap-cell:hover { opacity: 0.8; }
+        .heatmap-day-num { font-size: 7px; font-weight: 600; line-height: 1; color: rgba(0,0,0,0.5); }
+        .heatmap-day-pct { font-size: 6px; font-weight: 700; line-height: 1.4; color: rgba(0,0,0,0.65); }
+        .heatmap-cell.level-0 { background-color: #fee2e2; }
         .heatmap-cell.level-1 { background-color: #dcfce7; }
         .heatmap-cell.level-2 { background-color: #86efac; }
         .heatmap-cell.level-3 { background-color: #22c55e; }
         .heatmap-cell.level-4 { background-color: #15803d; }
+        .heatmap-cell.level-3 .heatmap-day-num, .heatmap-cell.level-3 .heatmap-day-pct,
+        .heatmap-cell.level-4 .heatmap-day-num, .heatmap-cell.level-4 .heatmap-day-pct { color: rgba(255,255,255,0.9); }
 
         .date-picker-input::-webkit-calendar-picker-indicator {
             cursor: pointer;
@@ -184,7 +201,33 @@
                         <button onclick="changeYear(1)" class="p-1.5 hover:bg-white rounded-lg transition-all">→</button>
                     </div>
                 </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8" id="year-heatmap-container"></div>
+
+                <!-- Métricas Anuais -->
+                <div class="bg-gradient-to-br from-blue-50 to-indigo-50 p-5 rounded-2xl border border-blue-100">
+                    <div class="flex items-start justify-between mb-4">
+                        <div>
+                            <p class="text-[10px] font-bold text-blue-500 uppercase tracking-wider mb-1">Conclusão Anual</p>
+                            <span id="annual-pct" class="text-4xl font-bold text-slate-800">0%</span>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Total realizado</p>
+                            <p id="annual-stats" class="text-sm font-semibold text-slate-600">0 de 0</p>
+                        </div>
+                    </div>
+                    <div class="progress-bar-container h-2.5">
+                        <div id="annual-fill" class="progress-fill h-full bg-blue-500" style="width: 0%; border-radius: 10px;"></div>
+                    </div>
+                    <div class="flex gap-4 mt-4 flex-wrap">
+                        <div class="flex items-center gap-1.5"><div class="w-3 h-3 rounded bg-slate-200"></div><span class="text-[10px] text-slate-500">Sem dados</span></div>
+                        <div class="flex items-center gap-1.5"><div class="w-3 h-3 rounded bg-red-200"></div><span class="text-[10px] text-slate-500">0%</span></div>
+                        <div class="flex items-center gap-1.5"><div class="w-3 h-3 rounded bg-green-100"></div><span class="text-[10px] text-slate-500">1–33%</span></div>
+                        <div class="flex items-center gap-1.5"><div class="w-3 h-3 rounded bg-green-300"></div><span class="text-[10px] text-slate-500">34–66%</span></div>
+                        <div class="flex items-center gap-1.5"><div class="w-3 h-3 rounded bg-green-500"></div><span class="text-[10px] text-slate-500">67–99%</span></div>
+                        <div class="flex items-center gap-1.5"><div class="w-3 h-3 rounded bg-green-800"></div><span class="text-[10px] text-slate-500">100%</span></div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6" id="year-heatmap-container"></div>
             </div>
         </div>
     </div>
@@ -624,42 +667,132 @@
             document.getElementById('total-progress-fill').style.width = perc + '%';
         }
 
+        function getAllHabitsFlat() {
+            const all = [];
+            const tabs = ['diario', 'comercial', 'autocuidado', 'remedios', 'semanal', 'mensal'];
+            tabs.forEach(tab => {
+                (appState.habitConfig[tab] || []).forEach(entry => {
+                    if (typeof entry === 'object' && entry.category) {
+                        entry.items.forEach(h => all.push(h));
+                    } else if (typeof entry === 'string') {
+                        all.push(entry);
+                    }
+                });
+            });
+            return all;
+        }
+
+        function getDayCompletion(dateStr) {
+            if (dateStr > todayStr) return null;
+            const habits = getAllHabitsFlat();
+            let done = 0, total = 0;
+            habits.forEach(name => {
+                const delDate = appState.deletedHistory[name];
+                if (delDate && dateStr >= delDate) return;
+                const status = appState.userRecords[dateStr]?.[name] || '';
+                if (status === 'na') return;
+                total++;
+                if (status === 'done') done++;
+            });
+            if (total === 0) return null;
+            return { done, total, pct: Math.round((done / total) * 100) };
+        }
+
+        function getHeatmapLevel(pct) {
+            if (pct === 0) return 'level-0';
+            if (pct <= 33) return 'level-1';
+            if (pct <= 66) return 'level-2';
+            if (pct <= 99) return 'level-3';
+            return 'level-4';
+        }
+
+        function getMonthSuccessHabits(year, monthIdx) {
+            const habits = getAllHabitsFlat();
+            const days = new Date(year, monthIdx + 1, 0).getDate();
+            const successful = [];
+            habits.forEach(name => {
+                let done = 0, active = 0;
+                for (let d = 1; d <= days; d++) {
+                    const ds = `${year}-${String(monthIdx+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+                    if (ds > todayStr) break;
+                    const delDate = appState.deletedHistory[name];
+                    if (delDate && ds >= delDate) continue;
+                    const status = appState.userRecords[ds]?.[name] || '';
+                    if (status === 'na') continue;
+                    active++;
+                    if (status === 'done') done++;
+                }
+                if (active > 0 && done === active) successful.push(name);
+            });
+            return successful;
+        }
+
         function renderHeatmap() {
             const container = document.getElementById('year-heatmap-container');
             container.innerHTML = '';
-            const months = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
-            
+            const months = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+            const weekLabels = ['S','T','Q','Q','S','S','D'];
+            let annualDone = 0, annualTotal = 0;
+
             months.forEach((name, idx) => {
                 const div = document.createElement('div');
                 div.className = "bg-slate-50 p-4 rounded-xl border border-slate-100 shadow-sm";
-                let html = `<h4 class="font-bold text-slate-700 mb-3">${name}</h4><div class="heatmap-month-grid">`;
-                
+
                 const days = new Date(heatmapYear, idx+1, 0).getDate();
                 const first = new Date(heatmapYear, idx, 1).getDay();
-                
-                // Espaços vazios para alinhar os dias da semana
-                for(let i=0; i<(first===0?6:first-1); i++) html += `<div></div>`;
-                
-                for(let d=1; d<=days; d++) {
+
+                let html = `<h4 class="font-bold text-slate-700 mb-2 text-sm">${name}</h4>`;
+                html += `<div class="grid grid-cols-7 gap-[3px] text-center mb-1">`;
+                weekLabels.forEach(d => html += `<div class="text-[7px] text-slate-400 font-semibold">${d}</div>`);
+                html += `</div><div class="heatmap-month-grid">`;
+
+                for(let i = 0; i < (first === 0 ? 6 : first - 1); i++) html += `<div></div>`;
+
+                for(let d = 1; d <= days; d++) {
                     const ds = `${heatmapYear}-${String(idx+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-                    let count = 0; 
-                    if(appState.userRecords[ds]) {
-                        Object.values(appState.userRecords[ds]).forEach(v => { if(v === 'done') count++; });
-                    }
-                    
-                    let level = '';
-                    if (count > 0) {
-                        if (count <= 5) level = 'level-1';
-                        else if (count <= 15) level = 'level-2';
-                        else if (count <= 25) level = 'level-3';
-                        else level = 'level-4';
+                    const comp = getDayCompletion(ds);
+                    let level = '', pctText = '', title = ds;
+
+                    if (comp !== null) {
+                        annualDone += comp.done;
+                        annualTotal += comp.total;
+                        level = getHeatmapLevel(comp.pct);
+                        pctText = comp.pct + '%';
+                        title = `${ds}: ${comp.pct}% (${comp.done}/${comp.total} hábitos)`;
+                    } else if (ds <= todayStr) {
+                        title = `${ds}: sem dados`;
+                    } else {
+                        title = ds;
                     }
 
-                    html += `<div class="heatmap-cell ${level}" title="${ds}: ${count} feitos"></div>`;
+                    html += `<div class="heatmap-cell ${level}" title="${title}">
+                        <span class="heatmap-day-num">${d}</span>
+                        ${pctText ? `<span class="heatmap-day-pct">${pctText}</span>` : ''}
+                    </div>`;
                 }
-                div.innerHTML = html + `</div>`;
+
+                html += `</div>`;
+
+                // Destaque de Sucesso Mensal
+                const successHabits = getMonthSuccessHabits(heatmapYear, idx);
+                if (successHabits.length > 0) {
+                    html += `<div class="mt-3 pt-3 border-t border-slate-200">
+                        <p class="text-[9px] font-bold text-emerald-600 uppercase tracking-wide mb-1.5">★ 100% no mês</p>
+                        <div class="flex flex-wrap gap-1">
+                            ${successHabits.map(h => `<span class="text-[9px] bg-emerald-50 text-emerald-700 border border-emerald-100 px-1.5 py-0.5 rounded-full font-semibold" title="${h}">${h.length > 18 ? h.slice(0, 17) + '…' : h}</span>`).join('')}
+                        </div>
+                    </div>`;
+                }
+
+                div.innerHTML = html;
                 container.appendChild(div);
             });
+
+            // Atualiza métricas anuais
+            const annualPct = annualTotal > 0 ? Math.round((annualDone / annualTotal) * 100) : 0;
+            document.getElementById('annual-pct').textContent = annualPct + '%';
+            document.getElementById('annual-fill').style.width = annualPct + '%';
+            document.getElementById('annual-stats').textContent = `${annualDone.toLocaleString('pt-BR')} de ${annualTotal.toLocaleString('pt-BR')} hábitos·dia`;
         }
 
         init();
